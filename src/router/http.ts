@@ -64,9 +64,8 @@ const login = async (req: Request, res: Response) => {
   // }
   // })
   const { username, password } = req.body;
-  let sql: string =
-    "select * from users where username=" + "'" + username + "'";
-  connection.query(sql, async function (err, data: any) {
+  let sql: string = "SELECT * FROM users WHERE username = ?";
+  connection.query(sql, [username], async function (err, data: any) {
     if (data.length == 0) {
       await res.json({
         success: false,
@@ -97,7 +96,7 @@ const login = async (req: Request, res: Response) => {
               expires: new Date(new Date()).getTime() + expiresIn,
               // 这个标识是真实后端返回的接口，只是为了演示
               pureAdminBackend:
-                "这个标识是pure-admin-backend真实后端返回的接口，只是为了演示",
+                "这个标识是backend真实后端返回的接口(演示需要)",
             },
           });
         } else {
@@ -114,7 +113,7 @@ const login = async (req: Request, res: Response) => {
               expires: new Date(new Date()).getTime() + expiresIn,
               // 这个标识是真实后端返回的接口，只是为了演示
               pureAdminBackend:
-                "这个标识是pure-admin-backend真实后端返回的接口，只是为了演示",
+                "这个标识是backend真实后端返回的接口(演示需要)",
             },
           });
         }
@@ -167,9 +166,8 @@ const register = async (req: Request, res: Response) => {
       success: false,
       data: { message: Message[4] },
     });
-  let sql: string =
-    "select * from users where username=" + "'" + username + "'";
-  connection.query(sql, async (err, data: any) => {
+  let sql: string = "SELECT * FROM users WHERE username = ?";
+  connection.query(sql, [username], async (err, data: any) => {
     if (data.length > 0) {
       await res.json({
         success: false,
@@ -178,20 +176,8 @@ const register = async (req: Request, res: Response) => {
     } else {
       let time = await getFormatDate();
       let sql: string =
-        "insert into users (username,password,time) value(" +
-        "'" +
-        username +
-        "'" +
-        "," +
-        "'" +
-        createHash("md5").update(password).digest("hex") +
-        "'" +
-        "," +
-        "'" +
-        time +
-        "'" +
-        ")";
-      connection.query(sql, async function (err) {
+        "INSERT INTO users (username, password, time) VALUES (?, ?, ?)";
+      connection.query(sql, [username, createHash("md5").update(password).digest("hex"), time], async function (err) {
         if (err) {
           Logger.error(err);
         } else {
@@ -227,32 +213,30 @@ const updateList = async (req: Request, res: Response) => {
   let payload = null;
   try {
     const authorizationHeader = req.get("Authorization") as string;
-    const accessToken = authorizationHeader.substr("Bearer ".length);
+    const accessToken = authorizationHeader.substring("Bearer ".length);
     payload = jwt.verify(accessToken, secret.jwtSecret);
   } catch (error) {
     return res.status(401).end();
   }
   let modifySql: string = "UPDATE users SET username = ? WHERE id = ?";
-  let sql: string = "select * from users where id=" + id;
-  connection.query(sql, function (err, data) {
-    connection.query(sql, function (err) {
-      if (err) {
-        Logger.error(err);
-      } else {
-        let modifyParams: string[] = [username, id];
-        // 改
-        connection.query(modifySql, modifyParams, async function (err, result) {
-          if (err) {
-            Logger.error(err);
-          } else {
-            await res.json({
-              success: true,
-              data: { message: Message[7] },
-            });
-          }
-        });
-      }
-    });
+  let sql: string = "SELECT * FROM users WHERE id = ?";
+  connection.query(sql, [id], function (err, data) {
+    if (err) {
+      Logger.error(err);
+    } else {
+      let modifyParams: string[] = [username, id];
+      // 改
+      connection.query(modifySql, modifyParams, async function (err, result) {
+        if (err) {
+          Logger.error(err);
+        } else {
+          await res.json({
+            success: true,
+            data: { message: Message[7] },
+          });
+        }
+      });
+    }
   });
 };
 
@@ -276,13 +260,13 @@ const deleteList = async (req: Request, res: Response) => {
   let payload = null;
   try {
     const authorizationHeader = req.get("Authorization") as string;
-    const accessToken = authorizationHeader.substr("Bearer ".length);
+    const accessToken = authorizationHeader.substring("Bearer ".length);
     payload = jwt.verify(accessToken, secret.jwtSecret);
   } catch (error) {
     return res.status(401).end();
   }
-  let sql: string = "DELETE FROM users where id=" + "'" + id + "'";
-  connection.query(sql, async function (err, data) {
+  let sql: string = `DELETE FROM users WHERE id = ?`;
+  connection.query(sql, [id], async function (err, data) {
     if (err) {
       console.log(err);
     } else {
@@ -319,14 +303,13 @@ const searchPage = async (req: Request, res: Response) => {
   let payload = null;
   try {
     const authorizationHeader = req.get("Authorization") as string;
-    const accessToken = authorizationHeader.substr("Bearer ".length);
+    const accessToken = authorizationHeader.substring("Bearer ".length);
     payload = jwt.verify(accessToken, secret.jwtSecret);
   } catch (error) {
     return res.status(401).end();
   }
-  let sql: string =
-    "select * from users limit " + size + " offset " + size * (page - 1);
-  connection.query(sql, async function (err, data) {
+  let sql: string = "SELECT * FROM users LIMIT ? OFFSET ?";
+  connection.query(sql, [size, (page - 1) * size], async function (err, data) {
     if (err) {
       Logger.error(err);
     } else {
@@ -362,7 +345,7 @@ const searchVague = async (req: Request, res: Response) => {
   let payload = null;
   try {
     const authorizationHeader = req.get("Authorization") as string;
-    const accessToken = authorizationHeader.substr("Bearer ".length);
+    const accessToken = authorizationHeader.substring("Bearer ".length);
     payload = jwt.verify(accessToken, secret.jwtSecret);
   } catch (error) {
     return res.status(401).end();
@@ -372,19 +355,16 @@ const searchVague = async (req: Request, res: Response) => {
       success: false,
       data: { message: Message[9] },
     });
-  let sql: string = "select * from users";
-  sql += " WHERE username LIKE " + mysql.escape("%" + username + "%");
-  connection.query(sql, function (err, data) {
-    connection.query(sql, async function (err) {
-      if (err) {
-        Logger.error(err);
-      } else {
-        await res.json({
-          success: true,
-          data,
-        });
-      }
-    });
+  let sql: string = "SELECT * FROM users WHERE username LIKE ?";
+  connection.query(sql, [`%${username}%`], async function (err, data) {
+    if (err) {
+      Logger.error(err);
+    } else {
+      await res.json({
+        success: true,
+        data,
+      });
+    }
   });
 };
 
