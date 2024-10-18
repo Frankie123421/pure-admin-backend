@@ -15,8 +15,9 @@ const utils = require("@pureadmin/utils");
 /** 保存验证码 */
 let generateVerify: number;
 
-/** 过期时间 单位：毫秒 默认 1分钟过期，方便演示 */
-let expiresIn = 60000;
+/** 过期时间 单位：秒 */
+const accessTokenExpireTime = 60;
+const refreshTokenExpireTime = 120;
 
 /**
  * @typedef Error
@@ -77,46 +78,28 @@ const login = async (req: Request, res: Response) => {
       ) {
         const accessToken = jwt.sign(
           {
-            accountId: data[0].id,
+            username: data[0].username,
           },
           secret.jwtSecret,
-          { expiresIn }
+          { expiresIn: accessTokenExpireTime }
         );
-        if (username === "admin") {
-          await res.json({
-            success: true,
-            data: {
-              message: Message[2],
-              username,
-              // 这里模拟角色，根据自己需求修改
-              roles: ["admin"],
-              accessToken,
-              // 这里模拟刷新token，根据自己需求修改
-              refreshToken: "eyJhbGciOiJIUzUxMiJ9.adminRefresh",
-              expires: new Date(new Date()).getTime() + expiresIn,
-              // 这个标识是真实后端返回的接口，只是为了演示
-              pureAdminBackend:
-                "这个标识是backend真实后端返回的接口(演示需要)",
-            },
-          });
-        } else {
-          await res.json({
-            success: true,
-            data: {
-              message: Message[2],
-              username,
-              // 这里模拟角色，根据自己需求修改
-              roles: ["common"],
-              accessToken,
-              // 这里模拟刷新token，根据自己需求修改
-              refreshToken: "eyJhbGciOiJIUzUxMiJ9.adminRefresh",
-              expires: new Date(new Date()).getTime() + expiresIn,
-              // 这个标识是真实后端返回的接口，只是为了演示
-              pureAdminBackend:
-                "这个标识是backend真实后端返回的接口(演示需要)",
-            },
-          });
-        }
+        const refreshToken = jwt.sign(
+          {
+            username: data[0].username,
+          },
+          secret.jwtSecret,
+          { expiresIn: refreshTokenExpireTime }
+        );
+        await res.json({
+          success: true,
+          data: {
+            message: Message[2],
+            username,
+            roles: JSON.parse(data[0].role),
+            accessToken,
+            refreshToken
+          },
+        });
       } else {
         await res.json({
           success: false,
@@ -137,6 +120,7 @@ const login = async (req: Request, res: Response) => {
  * @typedef Register
  * @property {string} username.required - 用户名
  * @property {string} password.required - 密码
+ * @property {Array.<string>} role.required - 角色列表
  */
 
 /**
@@ -155,7 +139,7 @@ const login = async (req: Request, res: Response) => {
 
 const register = async (req: Request, res: Response) => {
   // const { username, password, verify } = req.body;
-  const { username, password } = req.body;
+  const { username, password, role } = req.body;
   // if (generateVerify !== verify)
   //   return res.json({
   //     success: false,
@@ -176,8 +160,8 @@ const register = async (req: Request, res: Response) => {
     } else {
       let time = await getFormatDate();
       let sql: string =
-        "INSERT INTO users (username, password, time) VALUES (?, ?, ?)";
-      connection.query(sql, [username, createHash("md5").update(password).digest("hex"), time], async function (err) {
+        "INSERT INTO users (username, password, role, time) VALUES (?, ?, ?, ?)";
+      connection.query(sql, [username, createHash("md5").update(password).digest("hex"), JSON.stringify(role), time], async function (err) {
         if (err) {
           Logger.error(err);
         } else {
@@ -493,6 +477,13 @@ const asyncRoutes = async (req: Request, res: Response) => {
     ]
   });
 };
+
+// const refreshToken = async (req: Request, res: Response) => {
+//   const { refreshToken } = req.body;
+//   const payload = jwt.verify(refreshToken, secret.jwtSecret);
+//   const accessToken = jwt.sign({ username: payload.username }, secret.jwtSecret, { expiresIn: accessTokenExpireTime });
+//   res.json({ success: true, data: { accessToken } });
+// };
 
 export {
   login,
